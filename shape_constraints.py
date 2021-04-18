@@ -40,11 +40,10 @@ def find_constraints(ctf1, ctf2):
 
 def extract_stockholm(ctf1, ctf2):
 
-    with open(f'{ctf1}_out.txt', 'r') as fin:
-        data = fin.read().splitlines(True)
-        stockholm_energy = data[2:]
-        just_stockholm = stockholm_energy[0].split()[0]
-        parsed = (pd.Series(parse_vienna_to_pairs(just_stockholm)[0]))
+    with open(f'{ctf1}_out_stockholm.txt', 'r') as fin:
+        data = fin.read()
+        
+        parsed = pd.Series(parse_vienna_to_pairs(data))
 
     constraints_ix = find_constraints(ctf1, ctf2)
 
