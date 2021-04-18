@@ -43,7 +43,7 @@ def extract_stockholm(ctf1, ctf2):
     with open(f'{ctf1}_out_stockholm.txt', 'r') as fin:
         data = fin.read()
         
-        parsed = pd.Series(parse_vienna_to_pairs(data))
+        parsed = pd.Series(parse_vienna_to_pairs(data)[0])
 
     constraints_ix = find_constraints(ctf1, ctf2)
 
