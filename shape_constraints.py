@@ -11,16 +11,26 @@ import sys
 import pandas as pd
 
 
-def constrain(data1, data2):
+def constrain_bin(data1, data2):
     equal = data1.eq(data2)
-    reindex = equal.reindex(range(equal.index[0]-1, len(equal)+1),
+    reindex = equal.reindex(range(equal.index[0]-2, len(equal)+1),
                             fill_value=equal.iloc[0])
-    reindex = reindex.reindex(range(reindex.index[0], reindex.index[-1]+2),
+    reindex = reindex.reindex(range(reindex.index[0], reindex.index[-1]+3),
                               fill_value=reindex.iloc[-1])
-    window = reindex.rolling(3).sum().shift(-1).loc[1:len(equal)]
-    constraints = window.values == 3
-    return constraints
+    window = reindex.rolling(5).sum().shift(-2).loc[1:len(equal)]
+    const_bin = window.values == 3
+    return const_bin
 
+
+
+def constrain(shape1, shape2):
+    shape1.loc[:, '2'] = shape2.iloc[:, 0]
+
+    constraints = (
+        (shape1.iloc[:, 0] >= shape1.iloc[:, 1] - shape1.iloc[:,1] * .3)
+        & (shape1.iloc[:, 0] <= shape1.iloc[:, 1] + shape1.iloc[:,1] * .3)
+            )
+    return constraints
 
 def find_constraints(ctf1, ctf2):
 
@@ -30,12 +40,11 @@ def find_constraints(ctf1, ctf2):
                            index_col=0)
 
     bins = pd.IntervalIndex.from_tuples([(-.00001, 0.4), (0.4, 0.75),
-                                         (0.75, 1)], closed='right')
+                                          (0.75, 1)], closed='right')
     data1 = pd.cut(shape1.iloc[:, 0], bins=bins).iloc[:]
     data2 = pd.cut(shape2.iloc[:, 0], bins=bins).iloc[:]
 
-    constraints = pd.Series(constrain(data1, data2),
-                            index=data2.index)
+    constraints = constrain(shape1, shape2)
     constraints_index = set(constraints[constraints].index)
 
     return constraints_index
