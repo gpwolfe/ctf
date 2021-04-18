@@ -1,7 +1,10 @@
 """
 @author: gpwolfe
 """
+from argparse import ArgumentParser
 import os
+import sys
+
 import pandas as pd
 
 
@@ -21,61 +24,47 @@ def load_shape(directory):
     return shape_data
 
 
-def find_constraints(directory):
-    constraints_index = []
-    shape_data = load_shape(directory)
+def find_constraints(ctf1, ctf2):
+
+    shape1 = pd.read_table(f'{ctf1.upper()}.shape.txt', header=None,
+                           index_col=0)
+    shape2 = pd.read_table(f'{ctf2.upper()}.shape.txt', header=None,
+                           index_col=0)
+
     bins = pd.IntervalIndex.from_tuples([(-.00001, 0.35), (0.35, 0.7),
                                          (0.7, 1.1)], closed='right')
-    data1 = pd.cut(shape_data[0].iloc[:, 0], bins=bins).iloc[:]
+    data1 = pd.cut(shape1.iloc[:, 0], bins=bins).iloc[:]
+    data2 = pd.cut(shape2.iloc[:, 0], bins=bins).iloc[:]
 
-    for struct in shape_data[1:]:
-        data2 = pd.cut(struct.iloc[:, 0], bins=bins).iloc[:]
-        
-        constraints = pd.Series(constrain(data1, data2),
-                                index=struct.index)
-        constraints_index.append(set(constraints[constraints].index))
-        data1 = data2.loc[:]
+    constraints = pd.Series(constrain(data1, data2),
+                            index=data2.index)
+    constraints_index = set(constraints[constraints].index)
+
     return constraints_index
 
 
-def extract_stockholm(directory):
-    stock_fns = sorted([fn for fn in os.listdir() if fn.endswith('out.txt')])
-    count1 = 1
-    parsed = []
-    for fn in stock_fns:
-        with open(f'CTF{count1}_out.txt', 'r') as fin:
-            data = fin.read().splitlines(True)
-            stockholm_energy = data[2:]
+def extract_stockholm(ctf1, ctf2):
 
-            just_stockholm = stockholm_energy[0].split()[0]
+    with open(f'{ctf1}_out.txt', 'r') as fin:
+        data = fin.read().splitlines(True)
+        stockholm_energy = data[2:]
+        just_stockholm = stockholm_energy[0].split()[0]
+        parsed = (pd.Series(parse_vienna_to_pairs(just_stockholm)[0]))
 
-            parsed.append(pd.Series(parse_vienna_to_pairs(just_stockholm)[0]))
-            count1 += 1
+    constraints_ix = find_constraints(ctf1, ctf2)
 
-    constraints_ix = find_constraints(directory)
-    shape_stock = list(zip(constraints_ix, parsed[1:]))
+    const_pairs = []
+    for pair in parsed:
+        if (pair[0] in constraints_ix) and (pair[1] in constraints_ix):
+            const_pairs.append(pair)
 
-    const_sets = {}
-    count2 = 2
-    for line in shape_stock:
-        const_pairs = []
-        for pair in line[1]:
-            if (pair[0] in line[0]) and (pair[1] in line[0]):
-                const_pairs.append(pair)
-        const_sets[count2] = const_pairs
-        count2 += 1
-
-    for ix, key in enumerate(const_sets):
-        towrite = ""
-        for pair in const_sets[key]:
-                towrite+= f'{pair[0]}, {pair[1]}\n'
-        with open(f'CTF{key}_constraints.txt', 'w') as fout:
-            the_header = "DS:\n-1\nSS:\n-1\nMod:\n-1\nPairs:\n"
-            the_footer = "-1 -1\nFMN:\n-1\nForbids:\n-1 -1"
-            fout.writelines(the_header + towrite + the_footer)
-            
-
-
+    towrite = ""
+    for pair in const_pairs:
+        towrite += f'{pair[0]}, {pair[1]}\n'
+    with open(f'{ctf2.upper()}_constraints.txt', 'w') as fout:
+        the_header = "DS:\n-1\nSS:\n-1\nMod:\n-1\nPairs:\n"
+        the_footer = "-1 -1\nFMN:\n-1\nForbids:\n-1 -1"
+        fout.writelines(the_header + towrite + the_footer)
 
 
 class ExceptionOpenPairsProblem(Exception):
@@ -145,3 +134,20 @@ def parse_vienna_to_pairs(ss, remove_gaps_in_ss=False):
     pairs.sort()
     pairs_pk.sort()
     return(pairs, pairs_pk)
+
+
+def cmdline_exec(argv):
+    """Run electrostatics histrogram plotting from command line."""
+    parser = ArgumentParser(
+        description='')
+    parser.add_argument('ctf1', nargs='?',
+                        help='I.E.: "CTF1".')
+    parser.add_argument('ctf2', help='Path to new file.')
+
+    args = parser.parse_args(argv)
+    ctf1 = args.ctf1
+    ctf2 = args.ctf2
+    extract_stockholm(ctf1, ctf2)
+
+if __name__ == '__main__':
+    cmdline_exec(sys.argv[1:])
