@@ -10,18 +10,13 @@ import pandas as pd
 
 def constrain(data1, data2):
     equal = data1.eq(data2)
-    reindex = equal.reindex(range(-2, len(equal)+2), fill_value=True)
-    window = reindex.rolling(5).sum().shift(-2).loc[0:len(equal)-1]
+    reindex = equal.reindex(range(equal.index[0]-2, len(equal)+1),
+                            fill_value=equal.iloc[0])
+    reindex = reindex.reindex(range(reindex.index[0], reindex.index[-1]+3),
+                              fill_value=reindex.iloc[-1])
+    window = reindex.rolling(5).sum().shift(-2).loc[1:len(equal)]
     constraints = (window.values == 0) | (window.values == 5)
     return constraints
-
-def load_shape(directory):
-    shape_data = []
-    for fn in sorted(os.listdir(directory)):
-        if fn.endswith('shape.txt'):
-            shape_data.append(pd.read_table(os.path.join(directory, fn),
-                                            header=None, index_col=0))
-    return shape_data
 
 
 def find_constraints(ctf1, ctf2):
@@ -60,7 +55,7 @@ def extract_stockholm(ctf1, ctf2):
 
     towrite = ""
     for pair in const_pairs:
-        towrite += f'{pair[0]}, {pair[1]}\n'
+        towrite += f'{pair[0]} {pair[1]}\n'
     with open(f'{ctf2.upper()}_constraints.txt', 'w') as fout:
         the_header = "DS:\n-1\nSS:\n-1\nMod:\n-1\nPairs:\n"
         the_footer = "-1 -1\nFMN:\n-1\nForbids:\n-1 -1"
