@@ -66,10 +66,13 @@ def extract_stockholm(directory):
         count2 += 1
 
     for ix, key in enumerate(const_sets):
+        towrite = ""
+        for pair in const_sets[key]:
+                towrite+= f'{pair[0]}, {pair[1]}\n'
         with open(f'CTF{key}_constraints.txt', 'w') as fout:
-            for pair in const_sets[key]:
-                towrite = f'{pair[0]}, {pair[1]}\n'
-                fout.writelines(towrite)
+            the_header = "DS:\n-1\nSS:\n-1\nMod:\n-1\nPairs:\n"
+            the_footer = "-1 -1\nFMN:\n-1\nForbids:\n-1 -1"
+            fout.writelines(the_header + towrite + the_footer)
             
 
 
