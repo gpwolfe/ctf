@@ -10,7 +10,7 @@ import sys
 
 import pandas as pd
 
-"""
+
 def constrain(data1, data2):
     equal = data1.eq(data2)
     reindex = equal.reindex(range(equal.index[0]-1, len(equal)+1),
@@ -20,7 +20,7 @@ def constrain(data1, data2):
     window = reindex.rolling(3).sum().shift(-1).loc[1:len(equal)]
     constraints = window.values == 3
     return constraints
-"""
+
 
 def find_constraints(ctf1, ctf2):
 
@@ -29,14 +29,13 @@ def find_constraints(ctf1, ctf2):
     shape2 = pd.read_table(f'{ctf2.upper()}.shape.txt', header=None,
                            index_col=0)
 
-    bins = pd.IntervalIndex.from_tuples([(-.00001, 0.35), (0.35, 0.7),
-                                         (0.7, 1.1)], closed='right')
+    bins = pd.IntervalIndex.from_tuples([(-.00001, 0.4), (0.4, 0.75),
+                                         (0.75, 1)], closed='right')
     data1 = pd.cut(shape1.iloc[:, 0], bins=bins).iloc[:]
     data2 = pd.cut(shape2.iloc[:, 0], bins=bins).iloc[:]
 
-    # constraints = pd.Series(constrain(data1, data2),
-    #                         index=data2.index)
-    constraints = data1.eq(data2)
+    constraints = pd.Series(constrain(data1, data2),
+                            index=data2.index)
     constraints_index = set(constraints[constraints].index)
 
     return constraints_index
