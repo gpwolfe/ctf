@@ -12,45 +12,67 @@ def constrain(data1, data2):
     constraints = (window.values == 0) | (window.values == 5)
     return constraints
 
-def load_files(directory):
-    data = []
+def load_shape(directory):
+    shape_data = []
     for fn in sorted(os.listdir(directory)):
-        if fn.endswith('.txt'):
-            data.append(pd.read_table(os.path.join(directory, fn),
-                                      header=None, index_col=0))
-    return data
+        if fn.endswith('shape.txt'):
+            shape_data.append(pd.read_table(os.path.join(directory, fn),
+                                            header=None, index_col=0))
+    return shape_data
+
 
 def find_constraints(directory):
-    constraints = []
-    data = load_files(directory)
+    constraints_index = []
+    shape_data = load_shape(directory)
     bins = pd.IntervalIndex.from_tuples([(-.00001, 0.35), (0.35, 0.7),
                                          (0.7, 1.1)], closed='right')
-    data1 = pd.cut(data[0].iloc[:, 0], bins=bins).iloc[:]
+    data1 = pd.cut(shape_data[0].iloc[:, 0], bins=bins).iloc[:]
 
-    for struct in data[1:]:
+    for struct in shape_data[1:]:
         data2 = pd.cut(struct.iloc[:, 0], bins=bins).iloc[:]
-        constraints.append(pd.Series(constrain(data1, data2),
-                                     index=struct.index))
+        
+        constraints = pd.Series(constrain(data1, data2),
+                                index=struct.index)
+        constraints_index.append(set(constraints[constraints].index))
         data1 = data2.loc[:]
-    return constraints
+    return constraints_index
 
 
 def extract_stockholm(directory):
-    fns = sorted([fn for fn in os.listdir() if fn.endswith('out.txt')])
-    count = 1
-    for fn in fns:
-        with open(f'CTF{count}_out.txt', 'r') as fin:
+    stock_fns = sorted([fn for fn in os.listdir() if fn.endswith('out.txt')])
+    count1 = 1
+    parsed = []
+    for fn in stock_fns:
+        with open(f'CTF{count1}_out.txt', 'r') as fin:
             data = fin.read().splitlines(True)
             stockholm_energy = data[2:]
 
             just_stockholm = stockholm_energy[0].split()[0]
 
-            parse_vienna_to_pairs(just_stockholm)
+            parsed.append(pd.Series(parse_vienna_to_pairs(just_stockholm)[0]))
+            count1 += 1
 
-        with open(f'CTF{count}_out_stockholm.txt', 'w') as fout:
+    constraints_ix = find_constraints(directory)
+    shape_stock = list(zip(constraints_ix, parsed[1:]))
 
-            fout.writelines(just_stockholm)
-        count += 1
+    const_sets = {}
+    count2 = 2
+    for line in shape_stock:
+        const_pairs = []
+        for pair in line[1]:
+            if (pair[0] in line[0]) and (pair[1] in line[0]):
+                const_pairs.append(pair)
+        const_sets[count2] = const_pairs
+        count2 += 1
+
+    for ix, key in enumerate(const_sets):
+        with open(f'CTF{key}_constraints.txt', 'w') as fout:
+            for pair in const_sets[key]:
+                towrite = f'{pair[0]}, {pair[1]}\n'
+                fout.writelines(towrite)
+            
+
+
 
 
 class ExceptionOpenPairsProblem(Exception):
