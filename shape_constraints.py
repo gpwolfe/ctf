@@ -10,12 +10,12 @@ import pandas as pd
 
 def constrain(data1, data2):
     equal = data1.eq(data2)
-    reindex = equal.reindex(range(equal.index[0]-2, len(equal)+1),
+    reindex = equal.reindex(range(equal.index[0]-1, len(equal)+1),
                             fill_value=equal.iloc[0])
-    reindex = reindex.reindex(range(reindex.index[0], reindex.index[-1]+3),
+    reindex = reindex.reindex(range(reindex.index[0], reindex.index[-1]+2),
                               fill_value=reindex.iloc[-1])
-    window = reindex.rolling(5).sum().shift(-2).loc[1:len(equal)]
-    constraints = (window.values == 0) | (window.values == 5)
+    window = reindex.rolling(3).sum().shift(-1).loc[1:len(equal)]
+    constraints = window.values == 3
     return constraints
 
 
