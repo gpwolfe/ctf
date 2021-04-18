@@ -10,7 +10,7 @@ import sys
 
 import pandas as pd
 
-
+"""
 def constrain(data1, data2):
     equal = data1.eq(data2)
     reindex = equal.reindex(range(equal.index[0]-1, len(equal)+1),
@@ -20,7 +20,7 @@ def constrain(data1, data2):
     window = reindex.rolling(3).sum().shift(-1).loc[1:len(equal)]
     constraints = window.values == 3
     return constraints
-
+"""
 
 def find_constraints(ctf1, ctf2):
 
@@ -34,8 +34,9 @@ def find_constraints(ctf1, ctf2):
     data1 = pd.cut(shape1.iloc[:, 0], bins=bins).iloc[:]
     data2 = pd.cut(shape2.iloc[:, 0], bins=bins).iloc[:]
 
-    constraints = pd.Series(constrain(data1, data2),
-                            index=data2.index)
+    # constraints = pd.Series(constrain(data1, data2),
+    #                         index=data2.index)
+    constraints = data1.eq(data2)
     constraints_index = set(constraints[constraints].index)
 
     return constraints_index
@@ -46,7 +47,7 @@ def extract_stockholm(ctf1, ctf2):
     with open(f'{ctf1}_out_stockholm.txt', 'r') as fin:
         data = fin.read()
         
-        parsed = pd.Series(parse_vienna_to_pairs(data)[0])
+    parsed = pd.Series(parse_vienna_to_pairs(data)[0])
 
     constraints_ix = find_constraints(ctf1, ctf2)
 
