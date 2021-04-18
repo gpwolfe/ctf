@@ -4,16 +4,13 @@
 import os
 import pandas as pd
 
-def constrain(data1, data2, bins)
-data1 = pd.Series(data1)
-data2 = pd.Series(data2)
 
-data1_comp = pd.cut(data1, bins=bins)
-data2_comp = pd.cut(data2, bins=bins)
-equal = data1_comp.eq(data2_comp)
-reindex = equal.reindex(range(-2, len(equal)+2), fill_value=True)
-window = reindex.rolling(5).sum().shift(-2).loc[0:len(equal)-1]
-constraints = (window.values == 0) | (window.values == 5)
+def constrain(data1, data2):
+    equal = data1.eq(data2)
+    reindex = equal.reindex(range(-2, len(equal)+2), fill_value=True)
+    window = reindex.rolling(5).sum().shift(-2).loc[0:len(equal)-1]
+    constraints = (window.values == 0) | (window.values == 5)
+    return constraints
 
 def load_files(directory):
     data = []
@@ -24,14 +21,21 @@ def load_files(directory):
     return data
 
 def find_constraints(directory):
+    constraints = []
     data = load_files(directory)
-    
     bins = pd.IntervalIndex.from_tuples([(-.00001, 0.35), (0.35, 0.7),
                                          (0.7, 1.1)], closed='right')
-    first = pd.cut(data[0].iloc[:,0], bins=bins)
-    data1 = first.iloc[:]
+    data1 = pd.cut(data[0].iloc[:, 0], bins=bins).iloc[:]
+
     for struct in data[1:]:
-        
+        data2 = pd.cut(struct.iloc[:, 0], bins=bins).iloc[:]
+        constraints.append(pd.Series(constrain(data1, data2),
+                                     index=struct.index))
+        data1 = data2.loc[:]
+    return constraints
+
+
+
 
 
 class ExceptionOpenPairsProblem(Exception):
