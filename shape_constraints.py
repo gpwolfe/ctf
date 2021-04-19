@@ -1,4 +1,25 @@
 """
+Generate RNA folding constraints based on similar reactivities.
+
+Given a file containing known nucleotide bindings for an RNA fragment,
+module returns a file containing probable preserved bindings for a lengthened
+RNA fragment, based on the SHAPE reactivity for both fragments.
+
+This can be used to model a longer RNA structure by iteratively preserving
+folding constraints from shorter RNA fragments if the SHAPE reactivity does
+not change by more than a defined amount.
+
+Makes use of the parse_vienna_to_pairs function from rna-tools
+(https://rna-tools.readthedocs.io).
+
+SHAPE reactivity files should be saved using the following file name format:
+"CTF{ctf number}.shape.txt" -->  CTF4.shape.txt
+
+Example
+_______
+
+>>> python3 shape_constraints.py ctf2 ctf3
+
 @author: gpwolfe
 """
 from argparse import ArgumentParser
@@ -132,9 +153,11 @@ def parse_vienna_to_pairs(ss, remove_gaps_in_ss=False):
             pairs_pk.append([stack_pk.pop(), c + 1])
 
     if stack:
-        raise ExceptionOpenPairsProblem('Too many open pairs (()) in structure')
+        raise ExceptionOpenPairsProblem(
+            'Too many open pairs (()) in structure')
     if stack_pk:
-        raise ExceptionOpenPairsProblem('Too many open pairs [[]] in structure')
+        raise ExceptionOpenPairsProblem(
+            'Too many open pairs [[]] in structure')
 
     pairs.sort()
     pairs_pk.sort()
@@ -142,17 +165,18 @@ def parse_vienna_to_pairs(ss, remove_gaps_in_ss=False):
 
 
 def cmdline_exec(argv):
-    """Run electrostatics histrogram plotting from command line."""
+    """Generate binding constraints for RNA folding."""
     parser = ArgumentParser(
-        description='')
+        description='Generate binding constraints for RNA folding')
     parser.add_argument('ctf1', nargs='?',
-                        help='I.E.: "CTF1".')
-    parser.add_argument('ctf2', help='Path to new file.')
+                        help='i.e.: "CTF1".')
+    parser.add_argument('ctf2', help='i.e.: CTF2')
 
     args = parser.parse_args(argv)
     ctf1 = args.ctf1
     ctf2 = args.ctf2
     extract_stockholm(ctf1, ctf2)
+
 
 if __name__ == '__main__':
     cmdline_exec(sys.argv[1:])
