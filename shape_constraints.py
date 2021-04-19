@@ -16,20 +16,29 @@ SHAPE reactivity files should be saved using the following file name format:
 "CTF{ctf number}.shape.txt" -->  CTF4.shape.txt
 
 Example
-_______
-
+-------
 >>> python3 shape_constraints.py ctf2 ctf3
+
+Output file
+-----------
+CTF3_constraints.txt
 
 @author: gpwolfe
 """
 from argparse import ArgumentParser
-import os
 import sys
 
 import pandas as pd
 
 
 def constrain_bin(data1, data2):
+    """
+    Find indices of nucleotides that remain in same reactivity bin.
+
+    Low, medium and high reactivity are defined as separate bins. If a
+    nucleotide is in the same bin in both SHAPE files, this index is included
+    in the returned Series.
+    """
     equal = data1.eq(data2)
     reindex = equal.reindex(range(equal.index[0]-1, len(equal)+1),
                             fill_value=equal.iloc[0])
@@ -40,43 +49,75 @@ def constrain_bin(data1, data2):
     return pd.Series(const_bin)
 
 
-
 def constrain(shape1, shape2):
+    """Find indices of nts with similar SHAPE reactivity across files."""
     shape1.loc[:, '2'] = shape2.iloc[:, 0]
 
     constraints = (
-        (shape1.iloc[:, 0] >= shape1.iloc[:, 1] - shape1.iloc[:,1] * .2)
-        & (shape1.iloc[:, 0] <= shape1.iloc[:, 1] + shape1.iloc[:,1] * .2)
+        (shape1.iloc[:, 0] >= shape1.iloc[:, 1] - shape1.iloc[:, 1] * .2)
+        & (shape1.iloc[:, 0] <= shape1.iloc[:, 1] + shape1.iloc[:, 1] * .2)
             )
     return constraints
 
-def find_constraints(ctf1, ctf2):
 
+def find_constraints(ctf1, ctf2):
+    """
+    Generate set of indices for nucleotides with similar reactivity.
+
+    Parameters
+    ----------
+    ctf1 : string
+        'CTF' + number corresponding to shorter RNA fragment.
+    ctf2 : string
+        'CTF' + number corresponding to longer RNA fragment.
+
+    Returns
+    -------
+    Set
+        Combined indices of nucleotides with preserved reactivity.
+
+    """
     shape1 = pd.read_table(f'{ctf1.upper()}.shape.txt', header=None,
                            index_col=0)
     shape2 = pd.read_table(f'{ctf2.upper()}.shape.txt', header=None,
                            index_col=0)
 
     bins = pd.IntervalIndex.from_tuples([(-.00001, 0.4), (0.4, 0.75),
-                                          (0.75, 1)], closed='right')
+                                         (0.75, 1)], closed='right')
     data1 = pd.cut(shape1.iloc[:, 0], bins=bins).iloc[:]
     data2 = pd.cut(shape2.iloc[:, 0], bins=bins).iloc[:]
     const_bin = constrain_bin(data1, data2)
     const_bin_ix = set(const_bin[const_bin].index)
     constraints = constrain(shape1, shape2)
     constraints_index = set(constraints[constraints].index)
-                       
 
     return constraints_index | const_bin_ix
 
 
 def extract_stockholm(ctf1, ctf2):
+    """
+    Generate constraint files.
 
+    Constraints generated based on two SHAPE reactivity files and one
+    structure file in Stockholm format.
+
+    Parameters
+    ----------
+    ctf1 : string
+        'CTF' + number corresponding to SHAPE file and Stockholm file of
+        shorter RNA fragment.
+    ctf2 : string
+        'CTF' + number corresponding to SHAPE file of longer RNA fragment.
+
+    Returns
+    -------
+    None.
+
+    """
     with open(f'{ctf1}_out_stockholm.txt', 'r') as fin:
         data = fin.read()
-        
-    parsed = pd.Series(parse_vienna_to_pairs(data)[0])
 
+    parsed = pd.Series(parse_vienna_to_pairs(data)[0])
     constraints_ix = find_constraints(ctf1, ctf2)
 
     const_pairs = []
@@ -94,6 +135,8 @@ def extract_stockholm(ctf1, ctf2):
 
 
 class ExceptionOpenPairsProblem(Exception):
+    """Exception passed to parse_vienna_to_pairs."""
+
     pass
 
 
@@ -107,8 +150,8 @@ def parse_vienna_to_pairs(ss, remove_gaps_in_ss=False):
                                  ``ss = "(((((((((.((((.(((.....))))))......------)....."``
                                  works with pk of the first level, ``[[]]``
 
-    Returns:
-
+    Returns
+    -------
         list of two lists: (pairs, pairs_pk)
 
     Examples::
