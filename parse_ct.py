@@ -12,6 +12,22 @@ CT_LINE_RE = re.compile(
 
 
 def parse_ct(fn):
+    """
+    Create separate files of CTF data from a file with multiple models.
+
+    Data file from RNAStructureWeb at https://rna.urmc.rochester.edu.
+    Saves new .txt files with CTF number and model energy in file name.
+
+    Parameters
+    ----------
+    fn : string
+        Path to file containing multiple CTF models.
+
+    Returns
+    -------
+    None.
+
+    """
     with open(fn) as fin:
         for line in fin:
             ln = line
