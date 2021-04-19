@@ -1,4 +1,17 @@
 """
+Create separate files based on one file containing multiple RNA models.
+
+The RNAStructure tool from https://rna.urmc.rochester.edu can create a single
+file containing multiple RNA structures based on one set of constraints.
+This module parses these multi-structure files, creating new text files with
+the CTF number and model energy of each structure in the filename.
+The downloaded files are typically named "Fold.ct", "Fold copy.ct", etc.
+
+Command line example
+_______
+
+>>> python3 parse_ct.py Fold.ct
+
 @author: gpwolfe
 """
 from argparser import ArgumentParser
