@@ -26,41 +26,88 @@ CTF3_constraints.txt
 @author: gpwolfe
 """
 from argparse import ArgumentParser
+import os
+import re
 import sys
 
+import numpy as np
 import pandas as pd
 
+SD_LO = 0
+SD_MD = 0
+SD_HI = 0
 
-def constrain_bin(data1, data2):
-    """
-    Find indices of nucleotides that remain in same reactivity bin.
-
-    Low, medium and high reactivity are defined as separate bins. If a
-    nucleotide is in the same bin in both SHAPE files, this index is included
-    in the returned Series.
-    """
-    equal = data1.eq(data2)
-    reindex = equal.reindex(range(equal.index[0]-1, len(equal)+1),
-                            fill_value=equal.iloc[0])
-    reindex = reindex.reindex(range(reindex.index[0], reindex.index[-1]+2),
-                              fill_value=reindex.iloc[-1])
-    window = reindex.rolling(3).sum().shift(-1).loc[1:len(equal)]
-    const_bin = window.values == 3
-    return pd.Series(const_bin)
+AVE_LO = 0
+AVE_MD = 0
+AVE_HI = 0
 
 
-def constrain(shape1, shape2):
-    """Find indices of nts with similar SHAPE reactivity across files."""
-    shape1.loc[:, '2'] = shape2.iloc[:, 0]
+def get_st_dev(data_dir=os.getcwd()):
+    shape_re = re.compile(r'CTF\d+\.shape\.txt')
+    data_re = re.compile(r'(?P<index>\d+)\t(?P<val>-?\d+(\.\d+)?)\n?')
+    low = []
+    med = []
+    hi = []
+    for fn in os.listdir(data_dir):
+        if shape_re.match(fn):
+            with open(os.path.join(data_dir, fn), 'r') as f:
+                data = f.read().splitlines()
+                data = pd.Series({int(data_re.match(i).group('index')): float(
+                    data_re.match(i).group('val')) for i in data})
+                for val in data:
+                    if 0 < val < 0.5:
+                        low.append(val)
+                    if 0.3 < val < 0.8:
+                        med.append(val)
+                    if val >= 1.0:
+                        hi.append(1.0)
+                    if 0.6 < val < 1.0:
+                        hi.append(val)
 
-    constraints = (
-        (shape1.iloc[:, 0] >= shape1.iloc[:, 1] - shape1.iloc[:, 1] * .2)
-        & (shape1.iloc[:, 0] <= shape1.iloc[:, 1] + shape1.iloc[:, 1] * .2)
-            )
-    return constraints
+    global SD_LO
+    SD_LO = np.std(low)
+    global SD_MD
+    SD_MD = np.std(med)
+    global SD_HI
+    SD_HI = np.std(hi)
+    global AVE_LO
+    global AVE_MD
+    global AVE_HI
+    AVE_LO = np.mean(low)
+    AVE_MD = np.mean(med)
+    AVE_HI = np.mean(hi)
 
 
-def find_constraints(ctf1, ctf2):
+# def constrain_bin(data1, data2):
+#     """
+#     Find indices of nucleotides that remain near same reactivity bin.
+
+#     Low, medium and high reactivity are defined as separate bins. If a
+#     nucleotide is in the same bin in both SHAPE files, this index is included
+#     in the returned Series.
+#     """
+#     equal = data1.eq(data2)
+#     reindex = equal.reindex(range(equal.index[0]-1, len(equal)+1),
+#                             fill_value=equal.iloc[0])
+#     reindex = reindex.reindex(range(reindex.index[0], reindex.index[-1]+2),
+#                               fill_value=reindex.iloc[-1])
+#     window = reindex.rolling(3).sum().shift(-1).loc[1:len(equal)]
+#     const_bin = window.values == 3
+#     return pd.Series(const_bin)
+
+
+# def constrain(shape1, shape2):
+#     """Find indices of nts with similar SHAPE reactivity across files."""
+#     shape1.loc[:, '2'] = shape2.iloc[:, 0]
+
+#     constraints = (
+#         (shape1.iloc[:, 0] >= shape1.iloc[:, 1] - shape1.iloc[:, 1] * .2)
+#         & (shape1.iloc[:, 0] <= shape1.iloc[:, 1] + shape1.iloc[:, 1] * .2)
+#             )
+#     return constraints
+
+
+def find_similar_reactivity(ctf1, ctf2):
     """
     Generate set of indices for nucleotides with similar reactivity.
 
@@ -79,22 +126,35 @@ def find_constraints(ctf1, ctf2):
     """
     shape1 = pd.read_table(f'{ctf1.upper()}.shape.txt', header=None,
                            index_col=0)
+    shape1.loc[shape1.iloc[:, 0] > 1] = 1.0
     shape2 = pd.read_table(f'{ctf2.upper()}.shape.txt', header=None,
                            index_col=0)
+    shape2.loc[shape2.iloc[:, 0] > 1] = 1.0
+    get_st_dev()
+    # bins = pd.IntervalIndex.from_tuples([(-.00001, 0.4), (0.4, 0.75),
+    #                                      (0.75, 1)], closed='right')
+    # data1 = pd.cut(shape1.iloc[:, 0], bins=bins).iloc[:]
+    # data2 = pd.cut(shape2.iloc[:, 0], bins=bins).iloc[:]
 
-    bins = pd.IntervalIndex.from_tuples([(-.00001, 0.4), (0.4, 0.75),
-                                         (0.75, 1)], closed='right')
-    data1 = pd.cut(shape1.iloc[:, 0], bins=bins).iloc[:]
-    data2 = pd.cut(shape2.iloc[:, 0], bins=bins).iloc[:]
-    const_bin = constrain_bin(data1, data2)
-    const_bin_ix = set(const_bin[const_bin].index)
-    constraints = constrain(shape1, shape2)
-    constraints_index = set(constraints[constraints].index)
+    binned_lo = (((0 <= shape1) & (shape1 <= 0.4))
+                 & ((0 <= shape2.loc[:shape1.shape[0]])
+                     & (shape2.loc[:shape1.shape[0]] <= (0.4 + SD_LO))))
+    binned_md = (((0.4 < shape1) & (shape1 <= 0.7))
+                 & (((0.4 - SD_MD) < shape2.loc[:shape1.shape[0]])
+                     & (shape2.loc[:shape1.shape[0]] <= (0.7 + SD_MD))))
+    binned_hi = ((0.7 < shape1)
+                 & (((0.7 - SD_HI) < shape2.loc[:shape1.shape[0]])))
 
-    return constraints_index | const_bin_ix
+    constraints = binned_lo | binned_md | binned_hi
+    # const_bin = constrain_bin(data1, data2)
+    # const_bin_ix = set(const_bin[const_bin].index)
+    # constraints = constrain(shape1, shape2)
+    # constraints_index = set(constraints[constraints].index)
+
+    return constraints[constraints.values].index
 
 
-def extract_stockholm(ctf1, ctf2):
+def get_constraints(ctf1, ctf2):
     """
     Generate constraint files.
 
@@ -111,14 +171,15 @@ def extract_stockholm(ctf1, ctf2):
 
     Returns
     -------
-    None.
+    Standard deviation and average values for expanded bins
+    (from find_constraints).
 
     """
     with open(f'{ctf1}_out_stockholm.txt', 'r') as fin:
         data = fin.read()
 
     parsed = pd.Series(parse_vienna_to_pairs(data)[0])
-    constraints_ix = find_constraints(ctf1, ctf2)
+    constraints_ix = find_similar_reactivity(ctf1, ctf2)
 
     const_pairs = []
     for pair in parsed:
@@ -132,6 +193,8 @@ def extract_stockholm(ctf1, ctf2):
         the_header = "DS:\n-1\nSS:\n-1\nMod:\n-1\nPairs:\n"
         the_footer = "-1 -1\nFMN:\n-1\nForbids:\n-1 -1"
         fout.writelines(the_header + towrite + the_footer)
+    print(f'Standard deviations (low, med, high): {SD_LO}, {SD_MD}, {SD_HI}')
+    print(f'Average values(low, med, high): {AVE_LO}, {AVE_MD}, {AVE_HI}')
 
 
 class ExceptionOpenPairsProblem(Exception):
@@ -218,7 +281,7 @@ def cmdline_exec(argv):
     args = parser.parse_args(argv)
     ctf1 = args.ctf1
     ctf2 = args.ctf2
-    extract_stockholm(ctf1, ctf2)
+    get_constraints(ctf1, ctf2)
 
 
 if __name__ == '__main__':
