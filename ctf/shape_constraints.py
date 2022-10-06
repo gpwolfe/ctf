@@ -43,17 +43,23 @@ AVE_HI = 0
 
 
 def get_st_dev(data_dir=os.getcwd()):
-    shape_re = re.compile(r'CTF\d+\.shape\.txt')
-    data_re = re.compile(r'(?P<index>\d+)\t(?P<val>-?\d+(\.\d+)?)\n?')
+    shape_re = re.compile(r"CTF\d+\.shape\.txt")
+    data_re = re.compile(r"(?P<index>\d+)\t(?P<val>-?\d+(\.\d+)?)\n?")
     low = []
     med = []
     hi = []
     for fn in os.listdir(data_dir):
         if shape_re.match(fn):
-            with open(os.path.join(data_dir, fn), 'r') as f:
+            with open(os.path.join(data_dir, fn), "r") as f:
                 data = f.read().splitlines()
-                data = pd.Series({int(data_re.match(i).group('index')): float(
-                    data_re.match(i).group('val')) for i in data})
+                data = pd.Series(
+                    {
+                        int(data_re.match(i).group("index")): float(
+                            data_re.match(i).group("val")
+                        )
+                        for i in data
+                    }
+                )
                 for val in data:
                     if 0 < val < 0.5:
                         low.append(val)
@@ -124,11 +130,9 @@ def find_similar_reactivity(ctf1, ctf2):
         Combined indices of nucleotides with preserved reactivity.
 
     """
-    shape1 = pd.read_table(f'{ctf1.upper()}.shape.txt', header=None,
-                           index_col=0)
+    shape1 = pd.read_table(f"{ctf1.upper()}.shape.txt", header=None, index_col=0)
     shape1.loc[shape1.iloc[:, 0] > 1] = 1.0
-    shape2 = pd.read_table(f'{ctf2.upper()}.shape.txt', header=None,
-                           index_col=0)
+    shape2 = pd.read_table(f"{ctf2.upper()}.shape.txt", header=None, index_col=0)
     shape2.loc[shape2.iloc[:, 0] > 1] = 1.0
     get_st_dev()
     # bins = pd.IntervalIndex.from_tuples([(-.00001, 0.4), (0.4, 0.75),
@@ -136,14 +140,15 @@ def find_similar_reactivity(ctf1, ctf2):
     # data1 = pd.cut(shape1.iloc[:, 0], bins=bins).iloc[:]
     # data2 = pd.cut(shape2.iloc[:, 0], bins=bins).iloc[:]
 
-    binned_lo = (((0 <= shape1) & (shape1 <= 0.4))
-                 & ((0 <= shape2.loc[:shape1.shape[0]])
-                     & (shape2.loc[:shape1.shape[0]] <= (0.4 + SD_LO))))
-    binned_md = (((0.4 < shape1) & (shape1 <= 0.7))
-                 & (((0.4 - SD_MD) < shape2.loc[:shape1.shape[0]])
-                     & (shape2.loc[:shape1.shape[0]] <= (0.7 + SD_MD))))
-    binned_hi = ((0.7 < shape1)
-                 & (((0.7 - SD_HI) < shape2.loc[:shape1.shape[0]])))
+    binned_lo = ((0 <= shape1) & (shape1 <= 0.4)) & (
+        (0 <= shape2.loc[: shape1.shape[0]])
+        & (shape2.loc[: shape1.shape[0]] <= (0.4 + SD_LO))
+    )
+    binned_md = ((0.4 < shape1) & (shape1 <= 0.7)) & (
+        ((0.4 - SD_MD) < shape2.loc[: shape1.shape[0]])
+        & (shape2.loc[: shape1.shape[0]] <= (0.7 + SD_MD))
+    )
+    binned_hi = (0.7 < shape1) & (((0.7 - SD_HI) < shape2.loc[: shape1.shape[0]]))
 
     constraints = binned_lo | binned_md | binned_hi
     # const_bin = constrain_bin(data1, data2)
@@ -175,7 +180,7 @@ def get_constraints(ctf1, ctf2):
     (from find_constraints).
 
     """
-    with open(f'{ctf1}_out_stockholm.txt', 'r') as fin:
+    with open(f"{ctf1}_out_stockholm.txt", "r") as fin:
         data = fin.read()
 
     parsed = pd.Series(parse_vienna_to_pairs(data)[0])
@@ -188,13 +193,13 @@ def get_constraints(ctf1, ctf2):
 
     towrite = ""
     for pair in const_pairs:
-        towrite += f'{pair[0]} {pair[1]}\n'
-    with open(f'{ctf2.upper()}_constraints.txt', 'w') as fout:
+        towrite += f"{pair[0]} {pair[1]}\n"
+    with open(f"{ctf2.upper()}_constraints.txt", "w") as fout:
         the_header = "DS:\n-1\nSS:\n-1\nMod:\n-1\nPairs:\n"
         the_footer = "-1 -1\nFMN:\n-1\nForbids:\n-1 -1"
         fout.writelines(the_header + towrite + the_footer)
-    print(f'Standard deviations (low, med, high): {SD_LO}, {SD_MD}, {SD_HI}')
-    print(f'Average values(low, med, high): {AVE_LO}, {AVE_MD}, {AVE_HI}')
+    print(f"Standard deviations (low, med, high): {SD_LO}, {SD_MD}, {SD_HI}")
+    print(f"Average values(low, med, high): {AVE_LO}, {AVE_MD}, {AVE_HI}")
 
 
 class ExceptionOpenPairsProblem(Exception):
@@ -243,40 +248,36 @@ def parse_vienna_to_pairs(ss, remove_gaps_in_ss=False):
 
     """
     if remove_gaps_in_ss:
-        ss = ss.replace('-', '')
+        ss = ss.replace("-", "")
     stack = []
     pairs = []
     pairs_pk = []
     stack_pk = []
     for c, s in enumerate(ss):
-        if s == '(':
+        if s == "(":
             stack.append(c + 1)
-        if s == ')':
+        if s == ")":
             pairs.append([stack.pop(), c + 1])
-        if s == '[':
+        if s == "[":
             stack_pk.append(c + 1)
-        if s == ']':
+        if s == "]":
             pairs_pk.append([stack_pk.pop(), c + 1])
 
     if stack:
-        raise ExceptionOpenPairsProblem(
-            'Too many open pairs (()) in structure')
+        raise ExceptionOpenPairsProblem("Too many open pairs (()) in structure")
     if stack_pk:
-        raise ExceptionOpenPairsProblem(
-            'Too many open pairs [[]] in structure')
+        raise ExceptionOpenPairsProblem("Too many open pairs [[]] in structure")
 
     pairs.sort()
     pairs_pk.sort()
-    return(pairs, pairs_pk)
+    return (pairs, pairs_pk)
 
 
 def cmdline_exec(argv):
     """Generate binding constraints for RNA folding."""
-    parser = ArgumentParser(
-        description='Generate binding constraints for RNA folding')
-    parser.add_argument('ctf1', nargs='?',
-                        help='i.e.: "CTF1".')
-    parser.add_argument('ctf2', help='i.e.: CTF2')
+    parser = ArgumentParser(description="Generate binding constraints for RNA folding")
+    parser.add_argument("ctf1", nargs="?", help='i.e.: "CTF1".')
+    parser.add_argument("ctf2", help="i.e.: CTF2")
 
     args = parser.parse_args(argv)
     ctf1 = args.ctf1
@@ -284,5 +285,5 @@ def cmdline_exec(argv):
     get_constraints(ctf1, ctf2)
 
 
-if __name__ == '__main__':
+if __name__ == "__main__":
     cmdline_exec(sys.argv[1:])
